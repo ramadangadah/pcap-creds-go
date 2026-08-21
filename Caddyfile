@@ -1,0 +1,28 @@
+{
+	# Email used for Let's Encrypt ACME registration / expiry notices.
+	email {$ACME_EMAIL}
+}
+
+# SITE_ADDRESS is your domain, e.g. creds.example.com
+# Caddy automatically obtains and renews a TLS certificate for it.
+{$SITE_ADDRESS} {
+	encode gzip
+
+	# Cap request bodies at the proxy as a first line of defense.
+	# Keep this >= MAX_UPLOAD_MB in the app (200MB here).
+	request_body {
+		max_size 210MB
+	}
+
+	reverse_proxy app:8000
+
+	# --- Optional second gate ---------------------------------------------
+	# Uncomment to require an extra HTTP Basic Auth prompt before the app's
+	# own login is even reachable. Generate the hash with:
+	#   docker run --rm caddy caddy hash-password --plaintext 'your-pass'
+	#
+	# basicauth {
+	# 	auditor <bcrypt-hash-here>
+	# }
+	# ----------------------------------------------------------------------
+}

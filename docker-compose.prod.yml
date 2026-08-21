@@ -1,0 +1,52 @@
+services:
+  app:
+    build: .
+    image: pcap-creds-go:latest
+    container_name: pcap-creds-app
+    environment:
+      - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-200}
+      - COOKIE_SECURE=true
+      - LIVE_CAPTURE=${LIVE_CAPTURE:-false}
+      - LIVE_PORT=${LIVE_PORT:-37008}
+      - LIVE_BIND=0.0.0.0
+      - ALLOWED_SOURCES=${ALLOWED_SOURCES:-}
+    # The web UI (8000) is reachable only through Caddy (below), never published
+    # to the host directly. The live TZSP port is published ONLY on the
+    # WireGuard interface address (WG_ADDR), so router streams arrive over the
+    # encrypted tunnel and the port is never exposed on the public NIC.
+    ports:
+      - "${WG_ADDR:?set WG_ADDR in .env}:${LIVE_PORT:-37008}:${LIVE_PORT:-37008}/udp"
+    expose:
+      - "8000"
+    volumes:
+      - pcap_data:/data          # admin account + findings (plaintext creds — keep private)
+    restart: unless-stopped
+    networks:
+      - webnet
+
+  caddy:
+    image: caddy:2
+    container_name: pcap-creds-caddy
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - SITE_ADDRESS=${SITE_ADDRESS:?set SITE_ADDRESS in .env}
+      - ACME_EMAIL=${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    networks:
+      - webnet
+
+networks:
+  webnet:
+
+volumes:
+  pcap_data:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,25 @@
+services:
+  pcap-creds:
+    build: .
+    image: pcap-creds-go:latest
+    container_name: pcap-creds-go
+    ports:
+      - "${WEB_PORT:-8888}:8000"   # dashboard on http://<lan-ip>:8888 (change via WEB_PORT)
+      - "37008:37008/udp"          # live TZSP capture from your devices
+    environment:
+      - MAX_UPLOAD_MB=200
+      - LIVE_CAPTURE=true          # real-time capture on by default for LAN use
+      - LIVE_PORT=37008
+      - LIVE_BIND=0.0.0.0
+      # Accept-all by default (empty). Optionally restrict to a range, e.g.
+      #   ALLOWED_SOURCES=192.168.1.0/24
+      - ALLOWED_SOURCES=
+      # Static blocks (comma-separated IPs/CIDRs). You can also block/unblock
+      # live from the dashboard; those persist in the data volume.
+      - BLOCKED_SOURCES=
+    volumes:
+      - pcap_data:/data
+    restart: unless-stopped
+
+volumes:
+  pcap_data:
