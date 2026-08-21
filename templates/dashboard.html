@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard — PCAP Credential Auditor</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <h1>PCAP Credential Auditor</h1>
+    <div class="topbar-right">
+      <span class="muted">{{.User}}</span>
+      <a href="/logout" class="logout">Log out</a>
+    </div>
+  </div>
+
+  {{if .ScanMsg}}<div class="flash">{{.ScanMsg}}</div>{{end}}
+
+  {{if .Live.Enabled}}
+  <div class="card live-card">
+    <div class="card-head">
+      <h2><span class="live-dot"></span>Live capture</h2>
+      <span class="muted">TZSP on UDP :{{.Live.Port}}</span>
+    </div>
+    <div class="live-stats">
+      <div><span class="live-num">{{.Live.Packets}}</span><span class="stat-label">packets</span></div>
+      <div><span class="live-num">{{.Live.ActiveFlows}}</span><span class="stat-label">active flows</span></div>
+      <div><span class="live-num">{{.Live.Sources}}</span><span class="stat-label">source devices</span></div>
+      <div>
+        {{if .Live.HasLast}}<span class="live-num small">{{.Live.LastPacket.Format "15:04:05"}}</span>{{else}}<span class="live-num small">—</span>{{end}}
+        <span class="stat-label">last packet</span>
+      </div>
+    </div>
+    <p class="muted small">Findings from live streams merge into the deduplicated list below. Refresh to update.</p>
+
+    <div class="live-manage">
+      <div class="live-col">
+        <h3>Source devices {{if .Live.AllowlistOn}}<span class="muted small">(allowlist on)</span>{{else}}<span class="muted small">(accept-all)</span>{{end}}</h3>
+        {{if .Live.Devices}}
+          <table class="mini">
+            <tbody>
+            {{range .Live.Devices}}
+              <tr>
+                <td class="mono">{{.IP}}</td>
+                <td class="muted small">{{.LastSeen.Format "15:04:05"}}</td>
+                <td class="right">
+                  {{if .Blocked}}
+                    <span class="tag blocked-tag">blocked</span>
+                  {{else}}
+                    <form method="post" action="/block" class="inline">
+                      <input type="hidden" name="entry" value="{{.IP}}">
+                      <button type="submit" class="mini-btn danger">Block</button>
+                    </form>
+                  {{end}}
+                </td>
+              </tr>
+            {{end}}
+            </tbody>
+          </table>
+        {{else}}
+          <p class="muted small">No sources seen yet.</p>
+        {{end}}
+        <form method="post" action="/block" class="block-add">
+          <input type="text" name="entry" class="filter" placeholder="IP or range (e.g. 192.168.1.50 or 192.168.1.0/24)">
+          <button type="submit" class="mini-btn">Block</button>
+        </form>
+      </div>
+
+      <div class="live-col">
+        <h3>Blocked</h3>
+        {{if .Live.Blocked}}
+          <table class="mini">
+            <tbody>
+            {{range .Live.Blocked}}
+              <tr>
+                <td class="mono">{{.}}</td>
+                <td class="right">
+                  <form method="post" action="/unblock" class="inline">
+                    <input type="hidden" name="entry" value="{{.}}">
+                    <button type="submit" class="mini-btn">Unblock</button>
+                  </form>
+                </td>
+              </tr>
+            {{end}}
+            </tbody>
+          </table>
+        {{else}}
+          <p class="muted small">Nothing blocked. Everything is accepted.</p>
+        {{end}}
+      </div>
+    </div>
+  </div>
+  {{end}}
+
+  <div class="card">
+    <form method="post" action="/analyze" enctype="multipart/form-data" class="upload-form">
+      <div>
+        <label for="pcap_file">Upload a .pcap / .pcapng file</label>
+        <input type="file" id="pcap_file" name="pcap_file" accept=".pcap,.pcapng,.cap" required>
+      </div>
+      <button type="submit">Analyze</button>
+    </form>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat">
+      <div class="stat-num">{{.Stats.TotalUnique}}</div>
+      <div class="stat-label">Unique credentials</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">{{.Stats.TotalOccurrences}}</div>
+      <div class="stat-label">Total occurrences</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">{{len .Stats.TopIPs}}</div>
+      <div class="stat-label">Distinct IPs (top shown)</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <h2>Most repeated IPs</h2>
+      {{if .Stats.TopIPs}}
+        <div class="bars">
+          {{range .Stats.TopIPs}}
+          <div class="bar-row">
+            <span class="bar-label mono">{{.IP}}</span>
+            <span class="bar-track"><span class="bar-fill" style="width: {{.Pct}}%"></span></span>
+            <span class="bar-count">{{.Count}}</span>
+          </div>
+          {{end}}
+        </div>
+      {{else}}
+        <p class="muted">No data yet — upload a capture.</p>
+      {{end}}
+    </div>
+
+    <div class="card">
+      <h2>By protocol</h2>
+      {{if .Stats.Protocols}}
+        <table class="mini">
+          <tbody>
+          {{range .Stats.Protocols}}
+            <tr><td>{{.Proto}}</td><td class="right">{{.Count}}</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      {{else}}
+        <p class="muted">No data yet.</p>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Findings <span class="muted">(deduplicated)</span></h2>
+      <div class="card-actions">
+        <input type="text" id="filter" class="filter" placeholder="Filter…" oninput="filterRows()">
+        <a href="/export/txt" class="button-link">.txt</a>
+        <a href="/export/csv" class="button-link">.csv</a>
+        <form method="post" action="/clear" onsubmit="return confirm('Clear all stored findings? This cannot be undone.');" class="inline">
+          <button type="submit" class="danger">Clear</button>
+        </form>
+      </div>
+    </div>
+
+    {{if .Findings}}
+      <table id="findings">
+        <thead>
+          <tr><th>Protocols</th><th>Username</th><th>Password</th><th class="right">Seen</th><th>IPs</th></tr>
+        </thead>
+        <tbody>
+          {{range .Findings}}
+          <tr>
+            <td>{{range .Protocols}}<span class="tag">{{.}}</span>{{end}}</td>
+            <td class="mono">{{.Username}}</td>
+            <td class="mono">{{.Password}}</td>
+            <td class="right">{{.Count}}</td>
+            <td class="mono small">{{range $i, $ip := .IPs}}{{if $i}}, {{end}}{{$ip}}{{end}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    {{else}}
+      <p class="muted">No cleartext credentials stored yet.</p>
+    {{end}}
+  </div>
+
+  <script>
+    function filterRows() {
+      var q = document.getElementById('filter').value.toLowerCase();
+      var rows = document.querySelectorAll('#findings tbody tr');
+      rows.forEach(function (row) {
+        row.style.display = row.textContent.toLowerCase().indexOf(q) > -1 ? '' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>

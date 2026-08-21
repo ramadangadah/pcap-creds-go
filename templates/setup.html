@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Set up — PCAP Credential Auditor</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="card login-card">
+    <h1>Welcome — create your admin account</h1>
+    <p class="muted">This is a one-time setup. These credentials will be
+      required to sign in from now on.</p>
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <form method="post" action="/setup">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" required autofocus autocomplete="username">
+      <label for="password">Password (min 8 characters)</label>
+      <input type="password" id="password" name="password" required autocomplete="new-password">
+      <label for="confirm">Confirm password</label>
+      <input type="password" id="confirm" name="confirm" required autocomplete="new-password">
+      <button type="submit">Create account</button>
+    </form>
+  </div>
+</body>
+</html>
